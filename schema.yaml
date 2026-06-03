@@ -1,0 +1,251 @@
+title: "Okorum - OKE en OCI (PresNet + TerMed + MongoDB)"
+description: "Despliega una VCN y 3 clusteres OKE Enhanced (Flannel, API privada, workers privados, LB) en sa-bogota-1. Patron de red segun el Ejemplo 2 de la documentacion OKE."
+schemaVersion: 1.1.0
+version: "20190304"
+locale: "en"
+
+# ---------------------------------------------------------------------------
+# Grupos del formulario (orden de aparicion)
+# ---------------------------------------------------------------------------
+variableGroups:
+  - title: "General"
+    variables:
+      - compartment_ocid
+      - region
+
+  - title: "Red (VCN)"
+    variables:
+      - vcn_name
+      - vcn_cidr
+      - vcn_dns_label
+
+  - title: "Compute y Kubernetes"
+    variables:
+      - node_shape
+      - kubernetes_version
+      - node_ssh_public_key
+
+  - title: "Bastion (acceso privado)"
+    variables:
+      - create_bastion
+      - bastion_subnet_cidr
+      - bastion_client_cidr
+
+  - title: "Cluster PresNet"
+    variables:
+      - presnet_enabled
+      - presnet_node_ocpus
+      - presnet_node_memory_gbs
+      - presnet_pool1_size
+      - presnet_pool2_size
+
+  - title: "Cluster TerMed"
+    variables:
+      - termed_enabled
+      - termed_node_ocpus
+      - termed_node_memory_gbs
+      - termed_pool1_size
+      - termed_pool2_size
+
+  - title: "Cluster MongoDB"
+    variables:
+      - mongodb_enabled
+      - mongodb_node_ocpus
+      - mongodb_node_memory_gbs
+      - mongodb_pool1_size
+      - mongodb_pool2_size
+
+  - title: "Avanzado (oculto)"
+    visible: false
+    variables:
+      - tenancy_ocid
+      - node_image_id
+
+# ---------------------------------------------------------------------------
+# Definicion de cada variable del formulario
+# ---------------------------------------------------------------------------
+variables:
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Compartment de destino"
+    description: "Compartment donde se crean los recursos (debe existir)."
+    required: true
+
+  region:
+    type: oci:identity:region:name
+    title: "Region"
+    description: "Region de despliegue."
+    required: true
+    default: "sa-bogota-1"
+
+  vcn_name:
+    type: string
+    title: "Nombre de la VCN"
+    required: true
+    default: "okorum-prod-vcn"
+
+  vcn_cidr:
+    type: string
+    title: "CIDR de la VCN"
+    description: "Bloque CIDR principal."
+    required: true
+    default: "10.0.0.0/16"
+
+  vcn_dns_label:
+    type: string
+    title: "DNS label de la VCN"
+    required: true
+    default: "okorumvcn"
+
+  node_shape:
+    type: enum
+    title: "Shape de los worker nodes"
+    description: "Forma de las VMs Flex de los nodos."
+    required: true
+    default: "VM.Standard.E6.Flex"
+    enum:
+      - "VM.Standard.E6.Flex"
+      - "VM.Standard.E5.Flex"
+      - "VM.Standard.E4.Flex"
+      - "VM.Standard.A1.Flex"
+
+  kubernetes_version:
+    type: string
+    title: "Version de Kubernetes"
+    description: "Dejar vacio para usar la ultima version soportada por OKE."
+    required: false
+    default: ""
+
+  node_ssh_public_key:
+    type: oci:core:ssh:publickey
+    title: "Llave SSH publica (opcional)"
+    required: false
+
+  create_bastion:
+    type: boolean
+    title: "Crear OCI Bastion"
+    description: "Para operar los API endpoints privados con kubectl."
+    default: true
+  bastion_subnet_cidr:
+    type: string
+    title: "CIDR de la subred del Bastion"
+    default: "10.0.99.0/24"
+    visible: create_bastion
+  bastion_client_cidr:
+    type: string
+    title: "CIDR autorizado a iniciar sesiones de Bastion"
+    description: "Idealmente tu IP/VPN, no 0.0.0.0/0."
+    default: "0.0.0.0/0"
+    visible: create_bastion
+
+  # --- PresNet ---
+  presnet_enabled:
+    type: boolean
+    title: "Desplegar cluster PresNet"
+    default: true
+  presnet_node_ocpus:
+    type: number
+    title: "OCPUs por nodo (PresNet)"
+    minimum: 1
+    maximum: 64
+    default: 1
+    visible: presnet_enabled
+  presnet_node_memory_gbs:
+    type: number
+    title: "Memoria GB por nodo (PresNet)"
+    minimum: 8
+    maximum: 1024
+    default: 8
+    visible: presnet_enabled
+  presnet_pool1_size:
+    type: number
+    title: "Nodos pool front (PresNet)"
+    minimum: 1
+    maximum: 50
+    default: 2
+    visible: presnet_enabled
+  presnet_pool2_size:
+    type: number
+    title: "Nodos pool back-apis (PresNet)"
+    minimum: 1
+    maximum: 50
+    default: 2
+    visible: presnet_enabled
+
+  # --- TerMed ---
+  termed_enabled:
+    type: boolean
+    title: "Desplegar cluster TerMed"
+    default: true
+  termed_node_ocpus:
+    type: number
+    title: "OCPUs por nodo (TerMed)"
+    minimum: 1
+    maximum: 64
+    default: 1
+    visible: termed_enabled
+  termed_node_memory_gbs:
+    type: number
+    title: "Memoria GB por nodo (TerMed)"
+    minimum: 8
+    maximum: 1024
+    default: 8
+    visible: termed_enabled
+  termed_pool1_size:
+    type: number
+    title: "Nodos pool front (TerMed)"
+    minimum: 1
+    maximum: 50
+    default: 2
+    visible: termed_enabled
+  termed_pool2_size:
+    type: number
+    title: "Nodos pool back-apis (TerMed)"
+    minimum: 1
+    maximum: 50
+    default: 2
+    visible: termed_enabled
+
+  # --- MongoDB ---
+  mongodb_enabled:
+    type: boolean
+    title: "Desplegar cluster MongoDB"
+    default: true
+  mongodb_node_ocpus:
+    type: number
+    title: "OCPUs por nodo (MongoDB)"
+    minimum: 1
+    maximum: 64
+    default: 2
+    visible: mongodb_enabled
+  mongodb_node_memory_gbs:
+    type: number
+    title: "Memoria GB por nodo (MongoDB)"
+    minimum: 8
+    maximum: 1024
+    default: 8
+    visible: mongodb_enabled
+  mongodb_pool1_size:
+    type: number
+    title: "Nodos pool db (MongoDB)"
+    minimum: 1
+    maximum: 50
+    default: 2
+    visible: mongodb_enabled
+  mongodb_pool2_size:
+    type: number
+    title: "Nodos pool db-io (MongoDB)"
+    minimum: 1
+    maximum: 50
+    default: 2
+    visible: mongodb_enabled
+
+  # --- Ocultos / avanzados ---
+  tenancy_ocid:
+    type: string
+    title: "Tenancy OCID"
+    required: false
+  node_image_id:
+    type: string
+    title: "OCID de imagen del nodo (override)"
+    required: false
