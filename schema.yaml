@@ -65,9 +65,8 @@ variables:
   region:
     type: oci:identity:region:name
     title: "Region"
-    description: "Region de despliegue. IMPORTANTE: debe coincidir con la region donde estas creando el stack."
+    description: "Region de despliegue. IMPORTANTE: debe coincidir con la region donde creas el stack. Sin default a proposito: seleccionala siempre."
     required: true
-    default: "sa-bogota-1"
 
   create_compartment:
     type: boolean
