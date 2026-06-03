@@ -6,7 +6,7 @@
 
 resource "oci_core_route_table" "bastion" {
   count          = var.create_bastion ? 1 : 0
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_id
   vcn_id         = oci_core_vcn.this.id
   display_name   = "rt-bastion"
   freeform_tags  = var.freeform_tags
@@ -27,7 +27,7 @@ resource "oci_core_route_table" "bastion" {
 
 resource "oci_core_security_list" "bastion" {
   count          = var.create_bastion ? 1 : 0
-  compartment_id = var.compartment_ocid
+  compartment_id = local.compartment_id
   vcn_id         = oci_core_vcn.this.id
   display_name   = "seclist-bastion"
   freeform_tags  = var.freeform_tags
@@ -47,7 +47,7 @@ resource "oci_core_security_list" "bastion" {
 
 resource "oci_core_subnet" "bastion" {
   count                      = var.create_bastion ? 1 : 0
-  compartment_id             = var.compartment_ocid
+  compartment_id             = local.compartment_id
   vcn_id                     = oci_core_vcn.this.id
   cidr_block                 = var.bastion_subnet_cidr
   display_name               = "private_bastion"
@@ -62,7 +62,7 @@ resource "oci_core_subnet" "bastion" {
 resource "oci_bastion_bastion" "this" {
   count                        = var.create_bastion ? 1 : 0
   bastion_type                 = "STANDARD"
-  compartment_id               = var.compartment_ocid
+  compartment_id               = local.compartment_id
   target_subnet_id             = oci_core_subnet.bastion[0].id
   name                         = "okorum-bastion"
   client_cidr_block_allow_list = [var.bastion_client_cidr]

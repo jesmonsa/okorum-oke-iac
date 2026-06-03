@@ -12,7 +12,7 @@ data "oci_containerengine_cluster_option" "this" {
 
 data "oci_containerengine_node_pool_option" "this" {
   node_pool_option_id = "all"
-  compartment_id      = var.compartment_ocid
+  compartment_id      = local.compartment_id
 }
 
 locals {
@@ -30,12 +30,15 @@ locals {
   ]
 
   oke_image_id = var.node_image_id != "" ? var.node_image_id : (length(local._matching_images) > 0 ? local._matching_images[0] : "")
+
+  # AD a usar: las indicadas en var.availability_domains, o todas las de la region.
+  ad_names = length(var.availability_domains) > 0 ? var.availability_domains : [for ad in data.oci_identity_availability_domains.ads.availability_domains : ad.name]
 }
 
 resource "oci_containerengine_cluster" "this" {
   for_each = local.clusters
 
-  compartment_id     = var.compartment_ocid
+  compartment_id     = local.compartment_id
   name               = each.value.display_name
   vcn_id             = oci_core_vcn.this.id
   kubernetes_version = local.k8s_version
@@ -64,7 +67,7 @@ resource "oci_containerengine_node_pool" "this" {
   for_each = local.node_pools
 
   cluster_id         = oci_containerengine_cluster.this[each.value.cluster].id
-  compartment_id     = var.compartment_ocid
+  compartment_id     = local.compartment_id
   name               = "${each.value.cluster}-${each.value.pool_name}"
   kubernetes_version = local.k8s_version
   node_shape         = each.value.node_shape
@@ -85,9 +88,9 @@ resource "oci_containerengine_node_pool" "this" {
     size = each.value.size
 
     dynamic "placement_configs" {
-      for_each = data.oci_identity_availability_domains.ads.availability_domains
+      for_each = local.ad_names
       content {
-        availability_domain = placement_configs.value.name
+        availability_domain = placement_configs.value
         subnet_id           = oci_core_subnet.nodes[each.value.cluster].id
       }
     }

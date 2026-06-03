@@ -1,8 +1,8 @@
 # Okorum — OKE en OCI (Terraform + Resource Manager)
 
-Despliegue de una **VCN** y **3 clusteres OKE Enhanced** (PresNet, TerMed, MongoDB) en `sa-bogota-1`, con patrón de red **Flannel CNI + API endpoint privado + worker nodes privados + Load Balancer** (Ejemplo 2 de la documentación oficial de OKE).
+Despliegue de una **VCN** y **3 clusteres OKE Enhanced** (PresNet, TerMed, MongoDB) en OCI, con patrón de red **Flannel CNI + API endpoint privado + worker nodes privados + Load Balancer** (Ejemplo 2 de la documentación oficial de OKE).
 
-Todo está parametrizado: shape, OCPUs, RAM, número de nodos, compartment, CIDRs y versión de Kubernetes se eligen por variables — desde un **formulario one-click** (Resource Manager) o desde `terraform.tfvars` (CLI).
+Todo está parametrizado: región, compartment (crear o existente), shape, OCPUs, RAM, número de nodos, CIDRs y versión de Kubernetes — desde un **formulario one-click** (Resource Manager) o desde `terraform.tfvars` (CLI).
 
 ---
 
@@ -10,46 +10,40 @@ Todo está parametrizado: shape, OCPUs, RAM, número de nodos, compartment, CIDR
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/jesmonsa/okorum-oke-iac/archive/refs/heads/main.zip)
 
-1. Haz clic en el botón. OCI abre Resource Manager con el formulario de `schema.yaml`: seleccionas **compartment**, **shape**, **OCPUs**, **RAM**, número de nodos, Bastion y qué clústeres desplegar.
+1. Haz clic en el botón. OCI abre Resource Manager con el formulario de `schema.yaml`: eliges **región**, si **creas un compartment** o usas uno existente, **shape**, **OCPUs**, **RAM**, número de nodos, Bastion y qué clústeres desplegar.
 2. Revisa el **Plan** y ejecuta **Apply**.
 
-Alternativa sin botón: Consola OCI → **Developer Services → Resource Manager → Stacks → Create Stack → Source: Source Code Control** → conectas este repo de GitHub.
+Alternativa sin botón: Consola OCI → **Developer Services → Resource Manager → Stacks → Create Stack → Source: Source Code Control** → conectas este repo.
 
 ---
 
 ## Opción 2 — CLI local
 
 ```bash
-# 1. Autentícate (usa ~/.oci/config perfil DEFAULT, o variables OCI_*)
-# 2. Prepara variables
 cp terraform.tfvars.example terraform.tfvars
-#    edita terraform.tfvars con tu compartment_ocid, tenancy_ocid, etc.
+#    edita terraform.tfvars (region, compartment, etc.)
 
 terraform init
 terraform plan
 terraform apply
 ```
 
-Acceso al clúster (API privada): el stack ya crea un **OCI Bastion** (`create_bastion = true`). Para operar `kubectl`:
+Autenticación local: usa tu `~/.oci/config` (perfil DEFAULT) o variables `OCI_*`.
+
+Acceso al clúster (API privada): el stack crea un **OCI Bastion** (`create_bastion = true`). Para `kubectl`:
 
 ```bash
-# 1. Genera el kubeconfig
 oci ce cluster create-kubeconfig --cluster-id <OCID_CLUSTER> \
-  --file $HOME/.kube/config --region sa-bogota-1 --token-version 2.0.0
+  --file $HOME/.kube/config --region <REGION> --token-version 2.0.0
 
-# 2. Crea una sesión de port-forwarding del Bastion al API endpoint privado (puerto 6443)
 oci bastion session create-port-forwarding \
-  --bastion-id <BASTION_OCID> \
-  --target-private-ip <IP_PRIVADA_API_ENDPOINT> \
-  --target-port 6443 \
-  --session-ttl 10800 \
-  --key-file ~/.ssh/id_rsa.pub
+  --bastion-id <BASTION_OCID> --target-private-ip <IP_PRIVADA_API> \
+  --target-port 6443 --session-ttl 10800 --key-file ~/.ssh/id_rsa.pub
 
-# 3. Abre el túnel SSH que entrega el comando anterior y luego:
 kubectl get nodes
 ```
 
-Alternativa: **OCI Cloud Shell** con acceso privado (private endpoint) sin necesidad de túnel.
+Alternativa: **OCI Cloud Shell** con acceso privado, sin túnel.
 
 ---
 
@@ -58,6 +52,7 @@ Alternativa: **OCI Cloud Shell** con acceso privado (private endpoint) sin neces
 | Archivo | Contenido |
 |---------|-----------|
 | `provider.tf` | Provider OCI + backend remoto opcional (Object Storage) |
+| `compartment.tf` | Crea el compartment (opcional) o usa uno existente |
 | `variables.tf` | Variables planas (las consume el formulario) |
 | `locals.tf` | Construye el mapa de clústeres desde las variables planas |
 | `network.tf` | VCN, IGW/NAT/Service GW, subredes, route tables, security lists (Ejemplo 2) |
@@ -75,8 +70,12 @@ Alternativa: **OCI Cloud Shell** con acceso privado (private endpoint) sin neces
 
 | Parámetro | Default | Notas |
 |-----------|---------|-------|
-| `compartment_ocid` | — | Compartment destino (debe existir) |
-| `region` | `sa-bogota-1` | Región |
+| `region` | `sa-bogota-1` | Cualquier región del tenancy |
+| `create_compartment` | `false` | `true` = Terraform crea el compartment |
+| `compartment_name` | `okorum-poc` | Nombre del compartment si se crea |
+| `parent_compartment_ocid` | "" | Padre del compartment (vacío = raíz del tenancy) |
+| `compartment_ocid` | "" | Compartment existente (si `create_compartment=false`) |
+| `availability_domains` | `[]` | Vacío = todos los AD de la región |
 | `node_shape` | `VM.Standard.E6.Flex` | E6/E5/E4/A1 Flex |
 | `kubernetes_version` | última soportada | Vacío = la más nueva de OKE |
 | `<cluster>_enabled` | `true` | Desplegar o no cada clúster |
@@ -100,10 +99,11 @@ Topología fija (CIDRs, nombres, LB público/privado) en `locals.tf` → `cluste
 
 ## Antes de ejecutar — checklist
 
-1. **Service limit de E6.** Se necesitan **16 OCPUs** `VM.Standard.E6.Flex` en `sa-bogota-1`. Verifica/solicita el aumento antes de ejecutar.
-2. **Compartment.** Debe existir; el código no lo crea.
-3. **Versión de K8s.** Si dejas `kubernetes_version=""` toma la última; revisa el output `node_image_id`. Si queda vacío, pasa `node_image_id` manualmente.
-4. **MongoDB sobre OKE (definitivo).** La BD corre como workload en `cluster-mongodb`. Este Terraform crea la infraestructura (red + OKE + LB privado); el motor MongoDB se aplica con `manifests/mongodb-oke.yaml` (StatefulSet ReplicaSet de 3 miembros + Block Volume CSI `oci-bv` + Service LoadBalancer interno + CronJob de backup) desde Bastion/Cloud Shell tras crear el clúster:
+1. **Service limit de E6.** Se necesitan **16 OCPUs** `VM.Standard.E6.Flex` en la región elegida. Verifica/solicita el aumento antes de ejecutar.
+2. **Compartment.** Puedes crearlo (`create_compartment = true`) o usar uno existente (`compartment_ocid`). Crear compartment requiere permiso *manage compartments* en el padre/tenancy. Nota: al hacer `destroy`, OCI tarda en eliminar el compartment (queda en estado "deleting").
+3. **Región y AD.** `region` admite cualquier región del tenancy; los nodos se distribuyen en todos los AD de esa región. Para fijar AD específicos usa `availability_domains`.
+4. **Versión de K8s.** Si dejas `kubernetes_version=""` toma la última; revisa el output `node_image_id`. Si queda vacío, pasa `node_image_id` manualmente.
+5. **MongoDB sobre OKE.** La BD corre como workload en `cluster-mongodb`. Este Terraform crea la infraestructura; el motor MongoDB se aplica con `manifests/mongodb-oke.yaml` (StatefulSet ReplicaSet de 3 miembros + Block Volume CSI `oci-bv` + LB interno + backup) desde Bastion/Cloud Shell:
 
 ```bash
 kubectl apply -f manifests/mongodb-oke.yaml

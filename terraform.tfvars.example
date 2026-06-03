@@ -4,9 +4,20 @@
 # Autenticacion local: usa ~/.oci/config (perfil DEFAULT) o variables OCI_*.
 ###############################################################################
 
-tenancy_ocid     = "ocid1.tenancy.oc1..xxxxxxxx"
-region           = "sa-bogota-1"
-compartment_ocid = "ocid1.compartment.oc1..xxxxxxxx"
+tenancy_ocid = "ocid1.tenancy.oc1..xxxxxxxx"
+region       = "sa-bogota-1" # cualquier region de tu tenancy
+
+# --- Compartment: crear nuevo O usar existente ---
+# Opcion A: usar uno existente (deja create_compartment = false)
+create_compartment = false
+compartment_ocid   = "ocid1.compartment.oc1..xxxxxxxx"
+# Opcion B: crear uno nuevo (pon create_compartment = true y comenta compartment_ocid)
+# create_compartment      = true
+# compartment_name        = "okorum-poc"
+# parent_compartment_ocid = "" # vacio = raiz del tenancy
+
+# --- AD (opcional): vacio = usa todos los AD de la region ---
+# availability_domains = ["xxxx:SA-BOGOTA-1-AD-1"]
 
 # --- VCN ---
 vcn_name      = "okorum-prod-vcn"

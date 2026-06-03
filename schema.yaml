@@ -1,17 +1,17 @@
 title: "Okorum - OKE en OCI (PresNet + TerMed + MongoDB)"
-description: "Despliega una VCN y 3 clusteres OKE Enhanced (Flannel, API privada, workers privados, LB) en sa-bogota-1. Patron de red segun el Ejemplo 2 de la documentacion OKE."
+description: "Despliega una VCN y 3 clusteres OKE Enhanced (Flannel, API privada, workers privados, LB). Patron de red segun el Ejemplo 2 de la documentacion OKE."
 schemaVersion: 1.1.0
 version: "20190304"
 locale: "en"
 
-# ---------------------------------------------------------------------------
-# Grupos del formulario (orden de aparicion)
-# ---------------------------------------------------------------------------
 variableGroups:
   - title: "General"
     variables:
-      - compartment_ocid
       - region
+      - create_compartment
+      - compartment_name
+      - parent_compartment_ocid
+      - compartment_ocid
 
   - title: "Red (VCN)"
     variables:
@@ -61,22 +61,40 @@ variableGroups:
       - tenancy_ocid
       - node_image_id
 
-# ---------------------------------------------------------------------------
-# Definicion de cada variable del formulario
-# ---------------------------------------------------------------------------
 variables:
-  compartment_ocid:
-    type: oci:identity:compartment:id
-    title: "Compartment de destino"
-    description: "Compartment donde se crean los recursos (debe existir)."
-    required: true
-
   region:
     type: oci:identity:region:name
     title: "Region"
-    description: "Region de despliegue."
+    description: "Region de despliegue (cualquiera del tenancy)."
     required: true
     default: "sa-bogota-1"
+
+  create_compartment:
+    type: boolean
+    title: "Crear un compartment nuevo"
+    description: "Si lo activas, Terraform crea el compartment. Si no, usa uno existente."
+    default: false
+
+  compartment_name:
+    type: string
+    title: "Nombre del compartment a crear"
+    default: "okorum-poc"
+    visible: create_compartment
+
+  parent_compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Compartment padre (vacio = raiz del tenancy)"
+    required: false
+    visible: create_compartment
+
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Compartment de destino (existente)"
+    description: "Compartment donde se crean los recursos."
+    required: false
+    visible:
+      not:
+        - create_compartment
 
   vcn_name:
     type: string

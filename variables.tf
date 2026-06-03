@@ -17,8 +17,28 @@ variable "region" {
 }
 
 variable "compartment_ocid" {
-  description = "OCID del compartment de destino (debe existir)."
+  description = "OCID del compartment destino (si create_compartment = false). Vacio si se crea uno nuevo."
   type        = string
+  default     = ""
+}
+
+# --- Compartment (crear o usar existente) -------------------------------------
+variable "create_compartment" {
+  description = "Si true, Terraform crea el compartment; si false, usa compartment_ocid existente."
+  type        = bool
+  default     = false
+}
+
+variable "compartment_name" {
+  description = "Nombre del compartment a crear (solo si create_compartment = true)."
+  type        = string
+  default     = "okorum-poc"
+}
+
+variable "parent_compartment_ocid" {
+  description = "OCID del compartment padre donde crear el nuevo (vacio = raiz del tenancy)."
+  type        = string
+  default     = ""
 }
 
 # --- VCN ----------------------------------------------------------------------
@@ -63,6 +83,12 @@ variable "node_ssh_public_key" {
   description = "Llave publica SSH para los nodos (opcional)."
   type        = string
   default     = ""
+}
+
+variable "availability_domains" {
+  description = "Lista de nombres de AD a usar para los nodos (vacio = todos los AD de la region)."
+  type        = list(string)
+  default     = []
 }
 
 # --- Bastion (acceso al API endpoint privado) ---------------------------------
