@@ -4,8 +4,10 @@
 
 locals {
   # Compartment para listar ADs (debe ser conocido en tiempo de plan).
-  # Fallback: tenancy -> compartment existente -> compartment padre.
-  ad_compartment_id = var.tenancy_ocid != "" ? var.tenancy_ocid : (var.compartment_ocid != "" ? var.compartment_ocid : var.parent_compartment_ocid)
+  # PRIORIDAD: compartment del usuario PRIMERO y tenancy de ULTIMO, porque en
+  # tenancies con IAM restrictivo listar ADs contra la raiz devuelve null
+  # (OCI filtra resultados sin error si no hay permiso a nivel tenancy).
+  ad_compartment_id = var.compartment_ocid != "" ? var.compartment_ocid : (var.parent_compartment_ocid != "" ? var.parent_compartment_ocid : var.tenancy_ocid)
 }
 
 data "oci_identity_availability_domains" "ads" {
@@ -45,7 +47,9 @@ locals {
   oke_image_id = var.node_image_id != "" ? var.node_image_id : (length(local._matching_images) > 0 ? local._matching_images[0] : "")
 
   # AD a usar: las indicadas en var.availability_domains, o todas las de la region.
-  ad_names = length(var.availability_domains) > 0 ? var.availability_domains : [for ad in data.oci_identity_availability_domains.ads.availability_domains : ad.name]
+  # coalesce evita el crash si el API devuelve null; la precondition del node
+  # pool valida que la lista no quede vacia y reporta el compartment usado.
+  ad_names = length(var.availability_domains) > 0 ? var.availability_domains : [for ad in coalesce(data.oci_identity_availability_domains.ads.availability_domains, []) : ad.name]
 }
 
 resource "oci_containerengine_cluster" "this" {
@@ -78,6 +82,13 @@ resource "oci_containerengine_cluster" "this" {
 
 resource "oci_containerengine_node_pool" "this" {
   for_each = local.node_pools
+
+  lifecycle {
+    precondition {
+      condition     = length(local.ad_names) > 0
+      error_message = "No se pudieron listar los Availability Domains usando el compartment '${local.ad_compartment_id}'. Causas tipicas: permisos IAM insuficientes en ese compartment, o valor vacio. Solucion: verifica permisos, o define la variable availability_domains manualmente (ej: [\"xxxx:US-ASHBURN-AD-1\"])."
+    }
+  }
 
   cluster_id         = oci_containerengine_cluster.this[each.value.cluster].id
   compartment_id     = local.compartment_id
