@@ -23,6 +23,7 @@ variableGroups:
     variables:
       - node_shape
       - kubernetes_version
+      - availability_domains_csv
       - node_ssh_public_key
 
   - title: "Bastion (acceso privado)"
@@ -64,7 +65,7 @@ variables:
   region:
     type: oci:identity:region:name
     title: "Region"
-    description: "Region de despliegue (cualquiera del tenancy)."
+    description: "Region de despliegue. IMPORTANTE: debe coincidir con la region donde estas creando el stack."
     required: true
     default: "sa-bogota-1"
 
@@ -83,7 +84,7 @@ variables:
   parent_compartment_ocid:
     type: oci:identity:compartment:id
     title: "Compartment padre (donde se crea el nuevo)"
-    description: "Selecciona la raiz del tenancy si no estas seguro."
+    description: "SELECCIONALO siempre: ahi se crea el compartment y se listan los Availability Domains."
     required: false
     visible: create_compartment
 
@@ -131,6 +132,13 @@ variables:
     type: string
     title: "Version de Kubernetes"
     description: "Dejar vacio para usar la ultima version soportada por OKE."
+    required: false
+    default: ""
+
+  availability_domains_csv:
+    type: string
+    title: "Availability Domains manuales (opcional)"
+    description: "Separados por coma, ej: Pgjw:US-ASHBURN-AD-1,Pgjw:US-ASHBURN-AD-2. Obtenlos en Cloud Shell con: oci iam availability-domain list. Vacio = deteccion automatica."
     required: false
     default: ""
 

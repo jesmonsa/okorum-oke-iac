@@ -46,10 +46,15 @@ locals {
 
   oke_image_id = var.node_image_id != "" ? var.node_image_id : (length(local._matching_images) > 0 ? local._matching_images[0] : "")
 
-  # AD a usar: las indicadas en var.availability_domains, o todas las de la region.
-  # coalesce evita el crash si el API devuelve null; la precondition del node
-  # pool valida que la lista no quede vacia y reporta el compartment usado.
-  ad_names = length(var.availability_domains) > 0 ? var.availability_domains : [for ad in coalesce(data.oci_identity_availability_domains.ads.availability_domains, []) : ad.name]
+  # AD a usar, en orden de prioridad:
+  # 1. var.availability_domains (lista, para tfvars/CLI)
+  # 2. var.availability_domains_csv (string separado por coma, para el formulario RM)
+  # 3. Deteccion automatica via data source (coalesce evita crash si llega null;
+  #    la precondition del node pool valida y reporta el compartment usado).
+  ad_names = length(var.availability_domains) > 0 ? var.availability_domains : (
+    trimspace(var.availability_domains_csv) != "" ? [for s in split(",", var.availability_domains_csv) : trimspace(s)] :
+    [for ad in coalesce(data.oci_identity_availability_domains.ads.availability_domains, []) : ad.name]
+  )
 }
 
 resource "oci_containerengine_cluster" "this" {
@@ -86,7 +91,7 @@ resource "oci_containerengine_node_pool" "this" {
   lifecycle {
     precondition {
       condition     = length(local.ad_names) > 0
-      error_message = "No se pudieron listar los Availability Domains usando el compartment '${local.ad_compartment_id}'. Causas tipicas: permisos IAM insuficientes en ese compartment, o valor vacio. Solucion: verifica permisos, o define la variable availability_domains manualmente (ej: [\"xxxx:US-ASHBURN-AD-1\"])."
+      error_message = "No se pudieron listar los Availability Domains usando el compartment '${local.ad_compartment_id}'. Causas tipicas: permisos IAM insuficientes en ese compartment, o valor vacio. Solucion: usa el campo 'Availability Domains manuales' del formulario (oci iam availability-domain list), o verifica permisos."
     }
   }
 
