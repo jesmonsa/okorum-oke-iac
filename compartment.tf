@@ -12,6 +12,13 @@ resource "oci_identity_compartment" "this" {
   description    = "Okorum POC - creado por Terraform"
   enable_delete  = true
   freeform_tags  = var.freeform_tags
+
+  lifecycle {
+    precondition {
+      condition     = var.parent_compartment_ocid != "" || var.tenancy_ocid != ""
+      error_message = "Para crear el compartment indica parent_compartment_ocid (o tenancy_ocid como raiz)."
+    }
+  }
 }
 
 locals {

@@ -58,7 +58,6 @@ variableGroups:
   - title: "Avanzado (oculto)"
     visible: false
     variables:
-      - tenancy_ocid
       - node_image_id
 
 variables:
@@ -83,7 +82,8 @@ variables:
 
   parent_compartment_ocid:
     type: oci:identity:compartment:id
-    title: "Compartment padre (vacio = raiz del tenancy)"
+    title: "Compartment padre (donde se crea el nuevo)"
+    description: "Selecciona la raiz del tenancy si no estas seguro."
     required: false
     visible: create_compartment
 
@@ -259,10 +259,8 @@ variables:
     visible: mongodb_enabled
 
   # --- Ocultos / avanzados ---
-  tenancy_ocid:
-    type: string
-    title: "Tenancy OCID"
-    required: false
+  # NOTA: tenancy_ocid NO se declara aqui a proposito: al no estar en el
+  # formulario, Resource Manager lo autocompleta con el tenancy de la sesion.
   node_image_id:
     type: string
     title: "OCID de imagen del nodo (override)"

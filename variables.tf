@@ -6,8 +6,9 @@
 # tenancy_ocid y region: en Resource Manager se autocompletan; en CLI local
 # se toman de tfvars o de tu ~/.oci/config.
 variable "tenancy_ocid" {
-  description = "OCID del tenancy."
+  description = "OCID del tenancy. En Resource Manager se autocompleta; en CLI ponlo en tfvars."
   type        = string
+  default     = ""
 }
 
 variable "region" {

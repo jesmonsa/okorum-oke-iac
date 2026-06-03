@@ -2,8 +2,21 @@
 # oke.tf - Clusteres OKE (Enhanced, Flannel, API privada) + node pools
 ###############################################################################
 
+locals {
+  # Compartment para listar ADs (debe ser conocido en tiempo de plan).
+  # Fallback: tenancy -> compartment existente -> compartment padre.
+  ad_compartment_id = var.tenancy_ocid != "" ? var.tenancy_ocid : (var.compartment_ocid != "" ? var.compartment_ocid : var.parent_compartment_ocid)
+}
+
 data "oci_identity_availability_domains" "ads" {
-  compartment_id = var.tenancy_ocid
+  compartment_id = local.ad_compartment_id
+
+  lifecycle {
+    precondition {
+      condition     = local.ad_compartment_id != ""
+      error_message = "Para listar los Availability Domains proporciona tenancy_ocid, compartment_ocid o parent_compartment_ocid (al menos uno no vacio)."
+    }
+  }
 }
 
 data "oci_containerengine_cluster_option" "this" {
