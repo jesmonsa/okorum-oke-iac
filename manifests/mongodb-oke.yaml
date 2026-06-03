@@ -1,0 +1,216 @@
+###############################################################################
+# MongoDB sobre OKE (cluster-mongodb) - Okorum
+# ReplicaSet en StatefulSet + OCI Block Volume CSI + LB interno + backup
+#
+# Antes de aplicar:
+#   1) Genera kubeconfig (API privada -> usa Bastion/Cloud Shell):
+#      oci ce cluster create-kubeconfig --cluster-id <OCID_CLUSTER_MONGODB> \
+#        --file $HOME/.kube/config --region sa-bogota-1 --token-version 2.0.0
+#   2) Reemplaza <OCID_SUBRED_PRIVATE_DB_LB> por el OCID real de private_db_lb.
+#   3) Cambia las credenciales del Secret (no usar las de ejemplo en prod).
+###############################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mongodb
+  labels:
+    project: okorum
+    env: poc
+---
+# StorageClass: OCI Block Volume CSI
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: oci-bv-retain
+provisioner: blockvolume.csi.oraclecloud.com
+parameters:
+  vpusPerGB: "10"
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+---
+# Secret con credenciales y keyFile del ReplicaSet (CAMBIAR EN PROD)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-secret
+  namespace: mongodb
+type: Opaque
+stringData:
+  MONGO_INITDB_ROOT_USERNAME: "admin"
+  MONGO_INITDB_ROOT_PASSWORD: "CAMBIAR_ESTE_PASSWORD"
+  # keyFile compartido para autenticacion interna del ReplicaSet.
+  # Genera uno con: openssl rand -base64 756
+  mongodb-keyfile: "REEMPLAZAR_POR_KEYFILE_BASE64"
+---
+# Service headless: DNS estable de los pods del StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  namespace: mongodb
+  labels:
+    app: mongodb
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017
+---
+# Service LoadBalancer INTERNO (consumido por PresNet/TerMed dentro de la VCN)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-internal
+  namespace: mongodb
+  labels:
+    app: mongodb
+  annotations:
+    oci.oraclecloud.com/load-balancer-type: "lb"
+    service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+    oci.oraclecloud.com/oci-load-balancer-subnet: "<OCID_SUBRED_PRIVATE_DB_LB>"
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "100"
+spec:
+  type: LoadBalancer
+  selector:
+    app: mongodb
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017
+---
+# StatefulSet: MongoDB ReplicaSet (3 miembros para quorum)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: mongodb
+  labels:
+    app: mongodb
+spec:
+  serviceName: mongodb-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["mongodb"]
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          command:
+            - "sh"
+            - "-c"
+            - |
+              cp /etc/secrets/mongodb-keyfile /data/keyfile
+              chmod 400 /data/keyfile
+              exec mongod --replSet rs0 --bind_ip_all --auth --keyFile /data/keyfile
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: MONGO_INITDB_ROOT_PASSWORD
+          resources:
+            requests:
+              cpu: "2"
+              memory: "7Gi"
+            limits:
+              cpu: "2"
+              memory: "8Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+            - name: keyfile
+              mountPath: /etc/secrets
+              readOnly: true
+      volumes:
+        - name: keyfile
+          secret:
+            secretName: mongodb-secret
+            items:
+              - key: mongodb-keyfile
+                path: mongodb-keyfile
+            defaultMode: 0400
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: oci-bv-retain
+        resources:
+          requests:
+            storage: 250Gi
+---
+# CronJob de backup: mongodump -> OCI Object Storage (ajustar bucket/credenciales)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongodb-backup
+  namespace: mongodb
+spec:
+  schedule: "0 3 * * *"
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 4
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: mongo:7.0
+              command:
+                - "sh"
+                - "-c"
+                - |
+                  TS=$(date +%Y%m%d-%H%M%S)
+                  mongodump --uri="mongodb://$MONGO_USER:$MONGO_PASS@mongodb-headless:27017/?replicaSet=rs0&authSource=admin" \
+                    --archive=/tmp/backup-$TS.gz --gzip
+                  # TODO: subir /tmp/backup-$TS.gz al bucket de OCI Object Storage
+                  # con OCI CLI (oci os object put) o rclone.
+              env:
+                - name: MONGO_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongodb-secret
+                      key: MONGO_INITDB_ROOT_USERNAME
+                - name: MONGO_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongodb-secret
+                      key: MONGO_INITDB_ROOT_PASSWORD
+###############################################################################
+# Tras el primer arranque, inicializa el ReplicaSet (una sola vez):
+#   kubectl -n mongodb exec -it mongodb-0 -- mongosh -u admin -p <PASS> --eval '
+#     rs.initiate({_id:"rs0", members:[
+#       {_id:0, host:"mongodb-0.mongodb-headless.mongodb.svc.cluster.local:27017"},
+#       {_id:1, host:"mongodb-1.mongodb-headless.mongodb.svc.cluster.local:27017"},
+#       {_id:2, host:"mongodb-2.mongodb-headless.mongodb.svc.cluster.local:27017"}
+#     ]})'
+###############################################################################

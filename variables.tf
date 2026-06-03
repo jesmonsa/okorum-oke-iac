@@ -1,0 +1,167 @@
+###############################################################################
+# variables.tf - Variables planas (las consume el formulario schema.yaml)
+###############################################################################
+
+# --- Provider -----------------------------------------------------------------
+# tenancy_ocid y region: en Resource Manager se autocompletan; en CLI local
+# se toman de tfvars o de tu ~/.oci/config.
+variable "tenancy_ocid" {
+  description = "OCID del tenancy."
+  type        = string
+}
+
+variable "region" {
+  description = "Region OCI de despliegue."
+  type        = string
+  default     = "sa-bogota-1"
+}
+
+variable "compartment_ocid" {
+  description = "OCID del compartment de destino (debe existir)."
+  type        = string
+}
+
+# --- VCN ----------------------------------------------------------------------
+variable "vcn_name" {
+  description = "Nombre de la VCN."
+  type        = string
+  default     = "okorum-prod-vcn"
+}
+
+variable "vcn_cidr" {
+  description = "CIDR de la VCN."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "vcn_dns_label" {
+  description = "DNS label de la VCN."
+  type        = string
+  default     = "okorumvcn"
+}
+
+# --- Compute / Kubernetes (globales) ------------------------------------------
+variable "node_shape" {
+  description = "Shape de los worker nodes (Flex)."
+  type        = string
+  default     = "VM.Standard.E6.Flex"
+}
+
+variable "kubernetes_version" {
+  description = "Version de Kubernetes (vacio = ultima soportada)."
+  type        = string
+  default     = ""
+}
+
+variable "node_image_id" {
+  description = "OCID de imagen de worker (vacio = se selecciona OL8 acorde a la version)."
+  type        = string
+  default     = ""
+}
+
+variable "node_ssh_public_key" {
+  description = "Llave publica SSH para los nodos (opcional)."
+  type        = string
+  default     = ""
+}
+
+# --- Bastion (acceso al API endpoint privado) ---------------------------------
+variable "create_bastion" {
+  description = "Crear OCI Bastion para operar los endpoints privados con kubectl."
+  type        = bool
+  default     = true
+}
+
+variable "bastion_subnet_cidr" {
+  description = "CIDR de la subred privada del Bastion."
+  type        = string
+  default     = "10.0.99.0/24"
+}
+
+variable "bastion_client_cidr" {
+  description = "CIDR autorizado para iniciar sesiones de Bastion (idealmente tu IP/VPN, no 0.0.0.0/0)."
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
+# --- Etiquetas ----------------------------------------------------------------
+variable "freeform_tags" {
+  description = "Freeform tags para todos los recursos."
+  type        = map(string)
+  default = {
+    project = "okorum"
+    env     = "poc"
+  }
+}
+
+# --- Cluster PresNet ----------------------------------------------------------
+variable "presnet_enabled" {
+  type    = bool
+  default = true
+}
+variable "presnet_node_ocpus" {
+  type    = number
+  default = 1
+}
+variable "presnet_node_memory_gbs" {
+  type    = number
+  default = 8
+}
+variable "presnet_pool1_size" {
+  description = "Nodos del pool front."
+  type        = number
+  default     = 2
+}
+variable "presnet_pool2_size" {
+  description = "Nodos del pool back-apis."
+  type        = number
+  default     = 2
+}
+
+# --- Cluster TerMed -----------------------------------------------------------
+variable "termed_enabled" {
+  type    = bool
+  default = true
+}
+variable "termed_node_ocpus" {
+  type    = number
+  default = 1
+}
+variable "termed_node_memory_gbs" {
+  type    = number
+  default = 8
+}
+variable "termed_pool1_size" {
+  description = "Nodos del pool front."
+  type        = number
+  default     = 2
+}
+variable "termed_pool2_size" {
+  description = "Nodos del pool back-apis."
+  type        = number
+  default     = 2
+}
+
+# --- Cluster MongoDB ----------------------------------------------------------
+variable "mongodb_enabled" {
+  type    = bool
+  default = true
+}
+variable "mongodb_node_ocpus" {
+  type    = number
+  default = 2
+}
+variable "mongodb_node_memory_gbs" {
+  type    = number
+  default = 8
+}
+variable "mongodb_pool1_size" {
+  description = "Nodos del pool db."
+  type        = number
+  default     = 2
+}
+variable "mongodb_pool2_size" {
+  description = "Nodos del pool db-io."
+  type        = number
+  default     = 2
+}

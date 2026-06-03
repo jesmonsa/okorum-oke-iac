@@ -1,0 +1,45 @@
+###############################################################################
+# terraform.tfvars.example
+# Copia a terraform.tfvars y completa. NO subir terraform.tfvars a GitHub.
+# Autenticacion local: usa ~/.oci/config (perfil DEFAULT) o variables OCI_*.
+###############################################################################
+
+tenancy_ocid     = "ocid1.tenancy.oc1..xxxxxxxx"
+region           = "sa-bogota-1"
+compartment_ocid = "ocid1.compartment.oc1..xxxxxxxx"
+
+# --- VCN ---
+vcn_name      = "okorum-prod-vcn"
+vcn_cidr      = "10.0.0.0/16"
+vcn_dns_label = "okorumvcn"
+
+# --- Compute / Kubernetes ---
+node_shape          = "VM.Standard.E6.Flex"
+kubernetes_version  = "" # vacio = ultima soportada por OKE
+node_ssh_public_key = "ssh-rsa AAAA... usuario@host"
+
+# --- Bastion (acceso al API privado) ---
+create_bastion      = true
+bastion_subnet_cidr = "10.0.99.0/24"
+bastion_client_cidr = "0.0.0.0/0" # restringe a tu IP/VPN en produccion
+
+# --- PresNet (4 OCPU E6) ---
+presnet_enabled         = true
+presnet_node_ocpus      = 1
+presnet_node_memory_gbs = 8
+presnet_pool1_size      = 2 # front
+presnet_pool2_size      = 2 # back-apis
+
+# --- TerMed (4 OCPU E6) ---
+termed_enabled         = true
+termed_node_ocpus      = 1
+termed_node_memory_gbs = 8
+termed_pool1_size      = 2 # front
+termed_pool2_size      = 2 # back-apis
+
+# --- MongoDB (8 OCPU E6) ---
+mongodb_enabled         = true
+mongodb_node_ocpus      = 2
+mongodb_node_memory_gbs = 8
+mongodb_pool1_size      = 2 # db
+mongodb_pool2_size      = 2 # db-io
