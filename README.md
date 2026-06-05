@@ -51,7 +51,7 @@ Alternativa: **OCI Cloud Shell** con acceso privado, sin túnel.
 
 | Archivo | Contenido |
 |---------|-----------|
-| `provider.tf` | Provider OCI + backend remoto opcional (Object Storage) |
+| `provider.tf` | Provider OCI (version fijada ~> 8.16) + backend remoto opcional |
 | `compartment.tf` | Crea el compartment (opcional) o usa uno existente |
 | `variables.tf` | Variables planas (las consume el formulario) |
 | `locals.tf` | Construye el mapa de clústeres desde las variables planas |
@@ -61,7 +61,7 @@ Alternativa: **OCI Cloud Shell** con acceso privado, sin túnel.
 | `outputs.tf` | OCIDs de VCN, clústeres, node pools y subredes |
 | `schema.yaml` | Formulario one-click de Resource Manager |
 | `terraform.tfvars.example` | Plantilla de variables para CLI |
-| `manifests/mongodb-oke.yaml` | Workload de MongoDB (se aplica con kubectl tras crear el clúster) |
+| `manifests/mongodb-oke.yaml` | Workload de MongoDB para validar la plataforma (kubectl) |
 | `.github/workflows/terraform.yml` | CI: `fmt` + `validate` en cada push/PR |
 
 ---
@@ -70,17 +70,17 @@ Alternativa: **OCI Cloud Shell** con acceso privado, sin túnel.
 
 | Parámetro | Default | Notas |
 |-----------|---------|-------|
-| `region` | `sa-bogota-1` | Cualquier región del tenancy |
+| `region` | (sin default) | Debe coincidir con la región donde se crea el stack |
 | `create_compartment` | `false` | `true` = Terraform crea el compartment |
 | `compartment_name` | `okorum-poc` | Nombre del compartment si se crea |
-| `parent_compartment_ocid` | "" | Padre del compartment (vacío = raíz del tenancy) |
+| `parent_compartment_ocid` | "" | Padre del compartment (seleccionarlo siempre al crear) |
 | `compartment_ocid` | "" | Compartment existente (si `create_compartment=false`) |
-| `availability_domains` | `[]` | Vacío = todos los AD de la región |
+| `availability_domains_csv` | "" | ADs separados por coma (bypass de autodetección) |
 | `node_shape` | `VM.Standard.E6.Flex` | E6/E5/E4/A1 Flex |
 | `kubernetes_version` | última soportada | Vacío = la más nueva de OKE |
 | `<cluster>_enabled` | `true` | Desplegar o no cada clúster |
 | `<cluster>_node_ocpus` | 1 (Mongo 2) | OCPUs por nodo |
-| `<cluster>_node_memory_gbs` | 8 | RAM por nodo |
+| `<cluster>_node_memory_gbs` | 8 (Mongo **16**) | RAM por nodo — 16 GB en BD por recomendación oficial de MongoDB |
 | `<cluster>_pool1_size` / `pool2_size` | 2 / 2 | Nodos por pool |
 
 Topología fija (CIDRs, nombres, LB público/privado) en `locals.tf` → `cluster_defaults`.
@@ -93,7 +93,21 @@ Topología fija (CIDRs, nombres, LB público/privado) en `locals.tf` → `cluste
 |---------|-------|-----|----|----|----|
 | PresNet | `10.0.10.0/24` | `10.0.11.0/24` | `10.0.12.0/24` (público) | front(2)+back-apis(2) | 4 |
 | TerMed  | `10.0.20.0/24` | `10.0.21.0/24` | `10.0.22.0/24` (público) | front(2)+back-apis(2) | 4 |
-| MongoDB | `10.0.30.0/24` | `10.0.31.0/24` | `10.0.32.0/24` (privado) | db(2)+db-io(2) | 8 |
+| MongoDB | `10.0.30.0/24` | `10.0.31.0/24` | `10.0.32.0/24` (privado) | db(2)+db-io(2) · **16 GB RAM/nodo** | 8 |
+
+---
+
+## Prerrequisitos del fabricante MongoDB (sesión 05-jun-2026)
+
+El despliegue productivo del motor lo realiza el equipo de **MongoDB (Enterprise Advanced v8.2 + Ops Manager)**. Para su engagement, esta plataforma debe entregar — y este stack ya lo cubre o lo deja preparado:
+
+| Prerrequisito de MongoDB | Cómo lo cubre este stack |
+|--------------------------|--------------------------|
+| Entorno K8s correctamente configurado | 3 clústeres OKE Enhanced con red del Ejemplo 2, API privada y última versión de Kubernetes ✅ |
+| Clases de volumen de alto desempeño | StorageClass `oci-bv-retain` con `vpusPerGB: 20` (Higher Performance) y 500 GB por réplica ✅ |
+| **16 GB de RAM** en los nodos de BD | Default `mongodb_node_memory_gbs = 16` (recomendación oficial; los agentes de Ops Manager consumen 3-5 GB) ✅ |
+| Certificados TLS x509 para firmar cada nodo | Definir con el cliente: emisión vía cert-manager en el clúster o CA corporativa. Coordinar las llaves TLS por dominio |
+| Políticas de respaldo, autenticación y logging documentadas | Responsabilidad del cliente antes del engagement; el CronJob de backup del manifiesto sirve como base |
 
 ---
 
@@ -101,9 +115,9 @@ Topología fija (CIDRs, nombres, LB público/privado) en `locals.tf` → `cluste
 
 1. **Service limit de E6.** Se necesitan **16 OCPUs** `VM.Standard.E6.Flex` en la región elegida. Verifica/solicita el aumento antes de ejecutar.
 2. **Compartment.** Puedes crearlo (`create_compartment = true`) o usar uno existente (`compartment_ocid`). Crear compartment requiere permiso *manage compartments* en el padre/tenancy. Nota: al hacer `destroy`, OCI tarda en eliminar el compartment (queda en estado "deleting").
-3. **Región y AD.** `region` admite cualquier región del tenancy; los nodos se distribuyen en todos los AD de esa región. Para fijar AD específicos usa `availability_domains`.
+3. **Región y AD.** `region` debe coincidir con la región de la consola; los nodos se distribuyen en todos los AD de esa región. Para fijar AD específicos usa `availability_domains_csv` (formulario) o `availability_domains` (tfvars).
 4. **Versión de K8s.** Si dejas `kubernetes_version=""` toma la última; revisa el output `node_image_id`. Si queda vacío, pasa `node_image_id` manualmente.
-5. **MongoDB sobre OKE.** La BD corre como workload en `cluster-mongodb`. Este Terraform crea la infraestructura; el motor MongoDB se aplica con `manifests/mongodb-oke.yaml` (StatefulSet ReplicaSet de 3 miembros + Block Volume CSI `oci-bv` + LB interno + backup) desde Bastion/Cloud Shell:
+5. **MongoDB sobre OKE.** La BD corre como workload en `cluster-mongodb`. Este Terraform crea la infraestructura; para validar la plataforma se aplica `manifests/mongodb-oke.yaml` (StatefulSet ReplicaSet de 3 miembros + Block Volume CSI de alto desempeño + LB interno + backup) desde Bastion/Cloud Shell:
 
 ```bash
 kubectl apply -f manifests/mongodb-oke.yaml

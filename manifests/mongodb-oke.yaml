@@ -2,10 +2,16 @@
 # MongoDB sobre OKE (cluster-mongodb) - Okorum
 # ReplicaSet en StatefulSet + OCI Block Volume CSI + LB interno + backup
 #
+# NOTA (sesion 05-jun-2026): el despliegue PRODUCTIVO del motor lo realiza el
+# equipo de MongoDB (Enterprise Advanced v8.2 + Ops Manager con su operador).
+# Este manifiesto sirve para VALIDAR la plataforma (storage class, red, LB
+# interno) y para pruebas del POC. Sizing alineado al oficial del fabricante:
+# nodos de 16 GB RAM, disco 500 GB por replica, storage de alto desempeno.
+#
 # Antes de aplicar:
 #   1) Genera kubeconfig (API privada -> usa Bastion/Cloud Shell):
 #      oci ce cluster create-kubeconfig --cluster-id <OCID_CLUSTER_MONGODB> \
-#        --file $HOME/.kube/config --region sa-bogota-1 --token-version 2.0.0
+#        --file $HOME/.kube/config --region <REGION> --token-version 2.0.0
 #   2) Reemplaza <OCID_SUBRED_PRIVATE_DB_LB> por el OCID real de private_db_lb.
 #   3) Cambia las credenciales del Secret (no usar las de ejemplo en prod).
 ###############################################################################
@@ -24,7 +30,7 @@ metadata:
   name: oci-bv-retain
 provisioner: blockvolume.csi.oraclecloud.com
 parameters:
-  vpusPerGB: "10"
+  vpusPerGB: "20" # higher performance (capa de persistencia de alto desempeno, requisito MongoDB)
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Retain
 allowVolumeExpansion: true
@@ -139,10 +145,10 @@ spec:
           resources:
             requests:
               cpu: "2"
-              memory: "7Gi"
+              memory: "10Gi"
             limits:
               cpu: "2"
-              memory: "8Gi"
+              memory: "12Gi" # nodo de 16 GB: deja margen para SO/kubelet y agentes de Ops Manager (3-5 GB)
           volumeMounts:
             - name: data
               mountPath: /data/db
@@ -165,7 +171,7 @@ spec:
         storageClassName: oci-bv-retain
         resources:
           requests:
-            storage: 250Gi
+            storage: 500Gi # sizing oficial MongoDB: 500 GB por replica de datos
 ---
 # CronJob de backup: mongodump -> OCI Object Storage (ajustar bucket/credenciales)
 apiVersion: batch/v1
