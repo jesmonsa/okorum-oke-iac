@@ -12,7 +12,7 @@ variable "tenancy_ocid" {
 }
 
 variable "region" {
-  description = "Region OCI de despliegue."
+  description = "Region OCI de despliegue. POC Okorum: sa-bogota-1 (Colombia)."
   type        = string
   default     = "sa-bogota-1"
 }
@@ -93,7 +93,7 @@ variable "availability_domains" {
 }
 
 variable "availability_domains_csv" {
-  description = "ADs separados por coma (alternativa manual para el formulario de Resource Manager). Ej: 'Pgjw:US-ASHBURN-AD-1,Pgjw:US-ASHBURN-AD-2'. Vacio = deteccion automatica."
+  description = "ADs separados por coma (alternativa manual para el formulario de Resource Manager). Bogota tiene 1 AD, ej: 'xxxx:SA-BOGOTA-1-AD-1'. Vacio = deteccion automatica."
   type        = string
   default     = ""
 }

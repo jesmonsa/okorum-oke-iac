@@ -91,7 +91,7 @@ resource "oci_containerengine_node_pool" "this" {
   lifecycle {
     precondition {
       condition     = length(local.ad_names) > 0
-      error_message = "No se pudieron listar los Availability Domains usando el compartment '${local.ad_compartment_id}'. Causas tipicas: permisos IAM insuficientes en ese compartment, o valor vacio. Solucion: usa el campo 'Availability Domains manuales' del formulario (oci iam availability-domain list), o verifica permisos."
+      error_message = "No se pudieron listar los Availability Domains usando el compartment '${local.ad_compartment_id}'. Causas tipicas: permisos IAM insuficientes en ese compartment, o valor vacio. Solucion: usa el campo 'Availability Domains manuales' del formulario (oci iam availability-domain list; en Bogota: xxxx:SA-BOGOTA-1-AD-1), o verifica permisos."
     }
   }
 

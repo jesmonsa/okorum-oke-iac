@@ -1,6 +1,6 @@
 # Okorum — OKE en OCI (Terraform + Resource Manager)
 
-Despliegue de una **VCN** y **3 clusteres OKE Enhanced** (PresNet, TerMed, MongoDB) en OCI, con patrón de red **Flannel CNI + API endpoint privado + worker nodes privados + Load Balancer** (Ejemplo 2 de la documentación oficial de OKE).
+Despliegue de una **VCN** y **3 clusteres OKE Enhanced** (PresNet, TerMed, MongoDB) en OCI — **POC Okorum: región `sa-bogota-1` (Colombia)** —, con patrón de red **Flannel CNI + API endpoint privado + worker nodes privados + Load Balancer** (Ejemplo 2 de la documentación oficial de OKE).
 
 Todo está parametrizado: región, compartment (crear o existente), shape, OCPUs, RAM, número de nodos, CIDRs y versión de Kubernetes — desde un **formulario one-click** (Resource Manager) o desde `terraform.tfvars` (CLI).
 
@@ -10,7 +10,7 @@ Todo está parametrizado: región, compartment (crear o existente), shape, OCPUs
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/jesmonsa/okorum-oke-iac/archive/refs/heads/main.zip)
 
-1. Haz clic en el botón. OCI abre Resource Manager con el formulario de `schema.yaml`: eliges **región**, si **creas un compartment** o usas uno existente, **shape**, **OCPUs**, **RAM**, número de nodos, Bastion y qué clústeres desplegar.
+1. **Sitúate en la región Colombia Central (Bogotá)** en la consola (esquina superior derecha) y haz clic en el botón. OCI abre Resource Manager con el formulario de `schema.yaml`: región (preseleccionada `sa-bogota-1`), compartment (crear o existente), shape, OCPUs, RAM, número de nodos, Bastion y qué clústeres desplegar.
 2. Revisa el **Plan** y ejecuta **Apply**.
 
 Alternativa sin botón: Consola OCI → **Developer Services → Resource Manager → Stacks → Create Stack → Source: Source Code Control** → conectas este repo.
@@ -34,7 +34,7 @@ Acceso al clúster (API privada): el stack crea un **OCI Bastion** (`create_bast
 
 ```bash
 oci ce cluster create-kubeconfig --cluster-id <OCID_CLUSTER> \
-  --file $HOME/.kube/config --region <REGION> --token-version 2.0.0
+  --file $HOME/.kube/config --region sa-bogota-1 --token-version 2.0.0
 
 oci bastion session create-port-forwarding \
   --bastion-id <BASTION_OCID> --target-private-ip <IP_PRIVADA_API> \
@@ -70,12 +70,12 @@ Alternativa: **OCI Cloud Shell** con acceso privado, sin túnel.
 
 | Parámetro | Default | Notas |
 |-----------|---------|-------|
-| `region` | (sin default) | Debe coincidir con la región donde se crea el stack |
+| `region` | `sa-bogota-1` | **POC Okorum: Colombia (Bogotá)**. Debe coincidir con la región de la consola |
 | `create_compartment` | `false` | `true` = Terraform crea el compartment |
 | `compartment_name` | `okorum-poc` | Nombre del compartment si se crea |
 | `parent_compartment_ocid` | "" | Padre del compartment (seleccionarlo siempre al crear) |
 | `compartment_ocid` | "" | Compartment existente (si `create_compartment=false`) |
-| `availability_domains_csv` | "" | ADs separados por coma (bypass de autodetección) |
+| `availability_domains_csv` | "" | ADs separados por coma (Bogotá: `xxxx:SA-BOGOTA-1-AD-1`) |
 | `node_shape` | `VM.Standard.E6.Flex` | E6/E5/E4/A1 Flex |
 | `kubernetes_version` | última soportada | Vacío = la más nueva de OKE |
 | `<cluster>_enabled` | `true` | Desplegar o no cada clúster |
@@ -113,9 +113,9 @@ El despliegue productivo del motor lo realiza el equipo de **MongoDB (Enterprise
 
 ## Antes de ejecutar — checklist
 
-1. **Service limit de E6.** Se necesitan **16 OCPUs** `VM.Standard.E6.Flex` en la región elegida. Verifica/solicita el aumento antes de ejecutar.
+1. **Service limit de E6.** Se necesitan **16 OCPUs** `VM.Standard.E6.Flex` en `sa-bogota-1`. Verifica/solicita el aumento antes de ejecutar (fue un bloqueador en pruebas tempranas del proyecto).
 2. **Compartment.** Puedes crearlo (`create_compartment = true`) o usar uno existente (`compartment_ocid`). Crear compartment requiere permiso *manage compartments* en el padre/tenancy. Nota: al hacer `destroy`, OCI tarda en eliminar el compartment (queda en estado "deleting").
-3. **Región y AD.** `region` debe coincidir con la región de la consola; los nodos se distribuyen en todos los AD de esa región. Para fijar AD específicos usa `availability_domains_csv` (formulario) o `availability_domains` (tfvars).
+3. **Región y AD.** La POC de Okorum se despliega en **`sa-bogota-1` (Colombia)**, que tiene **1 Availability Domain** (`xxxx:SA-BOGOTA-1-AD-1`): los 12 nodos quedan en ese AD distribuidos automáticamente entre *fault domains*. El código sigue siendo multi-región para otros ambientes (`availability_domains_csv` para fijar ADs manualmente).
 4. **Versión de K8s.** Si dejas `kubernetes_version=""` toma la última; revisa el output `node_image_id`. Si queda vacío, pasa `node_image_id` manualmente.
 5. **MongoDB sobre OKE.** La BD corre como workload en `cluster-mongodb`. Este Terraform crea la infraestructura; para validar la plataforma se aplica `manifests/mongodb-oke.yaml` (StatefulSet ReplicaSet de 3 miembros + Block Volume CSI de alto desempeño + LB interno + backup) desde Bastion/Cloud Shell:
 

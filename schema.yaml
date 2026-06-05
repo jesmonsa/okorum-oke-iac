@@ -1,5 +1,5 @@
 title: "Okorum - OKE en OCI (PresNet + TerMed + MongoDB)"
-description: "Despliega una VCN y 3 clusteres OKE Enhanced (Flannel, API privada, workers privados, LB). Patron de red segun el Ejemplo 2 de la documentacion OKE."
+description: "Despliega una VCN y 3 clusteres OKE Enhanced (Flannel, API privada, workers privados, LB) en sa-bogota-1. Patron de red segun el Ejemplo 2 de la documentacion OKE."
 schemaVersion: 1.1.0
 version: "20190304"
 locale: "en"
@@ -65,8 +65,9 @@ variables:
   region:
     type: oci:identity:region:name
     title: "Region"
-    description: "Region de despliegue. IMPORTANTE: debe coincidir con la region donde creas el stack. Sin default a proposito: seleccionala siempre."
+    description: "Region de despliegue de la POC Okorum: sa-bogota-1 (Colombia). IMPORTANTE: debe coincidir con la region donde creas el stack (esquina superior derecha de la consola)."
     required: true
+    default: "sa-bogota-1"
 
   create_compartment:
     type: boolean
@@ -137,7 +138,7 @@ variables:
   availability_domains_csv:
     type: string
     title: "Availability Domains manuales (opcional)"
-    description: "Separados por coma, ej: Pgjw:US-ASHBURN-AD-1,Pgjw:US-ASHBURN-AD-2. Obtenlos en Cloud Shell con: oci iam availability-domain list. Vacio = deteccion automatica."
+    description: "Separados por coma. Bogota tiene 1 AD, ej: xxxx:SA-BOGOTA-1-AD-1. Obtenlos en Cloud Shell con: oci iam availability-domain list. Vacio = deteccion automatica."
     required: false
     default: ""
 
