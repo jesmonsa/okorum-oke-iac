@@ -185,8 +185,9 @@ variable "mongodb_node_ocpus" {
   default = 2
 }
 variable "mongodb_node_memory_gbs" {
-  type    = number
-  default = 8
+  description = "RAM por nodo de BD. 16 GB por recomendacion oficial de MongoDB (sesion 05-jun-2026)."
+  type        = number
+  default     = 16
 }
 variable "mongodb_pool1_size" {
   description = "Nodos del pool db."

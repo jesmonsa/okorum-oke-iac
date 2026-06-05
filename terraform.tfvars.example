@@ -48,9 +48,9 @@ termed_node_memory_gbs = 8
 termed_pool1_size      = 2 # front
 termed_pool2_size      = 2 # back-apis
 
-# --- MongoDB (8 OCPU E6) ---
+# --- MongoDB (8 OCPU E6, 16 GB RAM/nodo por recomendacion de MongoDB) ---
 mongodb_enabled         = true
 mongodb_node_ocpus      = 2
-mongodb_node_memory_gbs = 8
+mongodb_node_memory_gbs = 16
 mongodb_pool1_size      = 2 # db
 mongodb_pool2_size      = 2 # db-io
