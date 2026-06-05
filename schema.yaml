@@ -246,9 +246,10 @@ variables:
   mongodb_node_memory_gbs:
     type: number
     title: "Memoria GB por nodo (MongoDB)"
+    description: "16 GB por recomendacion oficial de MongoDB (los agentes de Ops Manager consumen 3-5 GB)."
     minimum: 8
     maximum: 1024
-    default: 8
+    default: 16
     visible: mongodb_enabled
   mongodb_pool1_size:
     type: number
